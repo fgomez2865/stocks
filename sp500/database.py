@@ -1,3 +1,5 @@
+# 
+
 import bs4 as bs
 import requests
 import sqlite3
@@ -43,10 +45,24 @@ def checkTables(db,stocks):
 def insertData(db,stocks):
     conn = sqlite3.connect(db)
     c = conn.cursor()
-    start, end = dt.datetime(2010, 1, 1), dt.datetime(2020, 1, 1)
+    start, end = dt.datetime(2020, 1, 1), dt.datetime(2020, 9, 14)
     for stock in stocks:
-        df = web.DataReader(stock, 'yahoo', start, end)
-        print("===", stock, "===")
+
+        last = last_date (db, stock)
+
+        if last == end:
+            print(f"{stock} already loaded")
+            continue
+
+        if last is not None:
+            start = last + dt.timedelta(days=1)
+        print(f"==={stock}=== , {start.day}, {end.day}")
+
+        try:
+            df = web.DataReader(stock, 'yahoo', start, end)
+        except Exception as e:
+            print (f"{stock} Exception: {e}")
+
         print(df.tail(1))
         for idx, val in df.iterrows():
             try:
@@ -55,28 +71,57 @@ def insertData(db,stocks):
                     {'Date':idx.strftime('%Y-%m-%d %H-%M-%S'),'Open':val['Open'],'High':val['High'],'Low':val['Low'],'Close':val['Close']})
             except Error as e:
                 print("Error Inserting", stock, "Err:", e)
-    print("Inserted", stock)
-    conn.commit()
+        print("Inserted", stock)
+
+        conn.commit()
+
     conn.close()
 
 def checkData(db, stock):
-  conn = sqlite3.connect(db)
-  cursor = conn.cursor()
-  
-  start_date = '2019-12-01 00-00-00'
-  end_date = '2019-12-31 00-00-00'
 
-  print("(Date, Open, High, Low, Close)")
-  cursor.execute("SELECT * FROM '{}' WHERE Date BETWEEN '{}' AND '{}'".format(stock,start_date,end_date))
-  rows = cursor.fetchall()
-  for row in rows:
-      print(row)
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
 
-  conn.close()
+    start_date = '2020-09-01 00-00-00'
+    end_date = '2019-09-14 00-00-00'
+
+    print("(Date, Open, High, Low, Close)")
+    cursor.execute("SELECT * FROM '{}' WHERE Date BETWEEN '{}' AND '{}'".format(stock,start_date,end_date))
+    rows = cursor.fetchall()
+    for row in rows:
+        print(row)
+
+    conn.close()
+
+def last_date (db, stock): 
+
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+    query = f"select max(date) from '{stock}';".format(stock)
+    cursor.execute(query)
+    rows = cursor.fetchall()
+
+    str_date = rows[0][0]
+
+    if str_date is not None:
+        return dt.datetime.strptime(str_date, '%Y-%m-%d %H-%M-%S') 
+    else:
+        return None
+ 
+def main ():
+    # last_date(DB_NAME, 'AMZN')
+
+    # return
+
+    stocks = obtain_sp500_tickers()
+    # build_db(stocks)
+    insertData(DB_NAME, stocks)
+    # insertData(DB_NAME, ['AMZN'])
+    # checkTables(DB_NAME,stocks)
+    checkData(DB_NAME, 'AMZN')
+
+
+
 
 if __name__ == "__main__":
-    stocks = obtain_sp500_tickers()
-    build_db(stocks)
-    insertData(DB_NAME, stocks)
-    checkTables(DB_NAME,stocks)
-    checkData(DB_NAME, 'AMZN')
+    main()
