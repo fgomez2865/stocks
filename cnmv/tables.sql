@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS info_fondo (isin STRING PRIMARY KEY, tipo STRING, registro STRING, compartimento INTEGER, clase INTEGER);
+CREATE TABLE IF NOT EXISTS fondo_diario (isin STRING PRIMARY KEY, date DATETIME, vl FLOAT, participes INTEGER, patrimonio FLOAT);

@@ -5,6 +5,7 @@ import os
 
 import zipfile 
 from lxml import etree
+import sqlite3
 
 def download_file (year, month, url):
     print (f"{month = }, {url =}")
@@ -29,32 +30,68 @@ def get_files (year):
         month = result.parent.td.text
         relative_url = result.a["href"]
 
+def get_content (elm, tag):
+    query = f".//{tag}"
+
+    sub_elm = elm.find(query)
+    if sub_elm  is None:
+        return 0
+
+    print (sub_elm.text)
+
+    return sub_elm.text
+
+
 def read_vl(fn):
-
-    tags_text = ["Tipo", "NumerodeRegistro", "NumeroCompartimento", "ISIN"] 
-    tags = ["VLDiario", "ParticipesDiario", "PatrimonioDiario"]
-
-    tags_text = ["Tipo", "NumeroRegistro", "NumeroCompartimento", "ISIN"] 
-    tags_diario = [("VLDiario","VL_Dia"), 
-                  ("ParticipesDiario", "Participes_Dia"),
-                  ("PatrimonioDiario", "Patrimonio_Dia")]
 
     root = etree.parse(fn)
     entidades = root.findall("Entidad")
+
+    conn= sqlite3.connect("cnmv.db")
+    c = conn.cursor()
+
+
     for ent in entidades:
-        print (ent)
 
-        for tag in tags_text:
-          texto = ent.find(".//" + tag).text
-          print (texto)
+        tipo = get_content (ent, "Tipo")
+        registro = get_content (ent, "NumeroRegistro")
+        compartimento = get_content (ent, "NumeroCompartimento")
+        isin = get_content (ent, "ISIN")
+        clase = get_content (ent, "NumeroClase")
 
-        for tag_root, tag in tags_diario:
-          elm = ent.find(".//" + tag_root)
 
-          elm_diarios = elm.xpath(f".//*[starts-with(name(), '{tag}')]")
-          for elm_diario in elm_diarios:
-                
-            print (f"{elm_diario.tag = }, {elm_diario.text = }")
+        sql = f"INSERT INTO 'info_fondo' VALUES ('{isin}', '{tipo}', '{registro}', {compartimento}, {clase})"
+
+        try:
+            c.execute(sql)
+        except Exception as e:
+            print(f"Error creating table info_fondo {e = }\n{sql =}", )
+
+        conn.commit()
+
+        vl = get_content (ent, "VLDiario")
+        participes = get_content (ent, "ParticipesDiario")
+        patrimonio = get_content (ent, "PatrimonioDiario")
+
+        for dia in range(1,31):
+            vl = get_content (ent, f"VL_Dia{dia}")
+            participes = get_content (ent, f"Participes_Dia{dia}")
+            patrimonio = get_content (ent, f"Patrimonio_Dia{dia}")
+            _date = f"2020-02-{dia}"
+
+            sql = f"INSERT INTO 'fondo_diario' VALUES ('{isin}', {_date}, {vl}, '{participes}', {patrimonio})"
+
+            print(sql)
+
+            try:
+                c.execute(sql)
+            except Exception as e:
+                print(f"Error creating table info_fondo {e = }\n{sql =}", )
+
+            conn.commit()
+
+
+    conn.close()
 
 def main():
     # get_files("2019")
